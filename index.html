@@ -5,11 +5,49 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>汽车注塑件成本模型 · V1.5 专业测试版</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-    <!-- EmailJS SDK -->
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <!-- Tabler图标 - 使用国内加速 -->
+    <link rel="stylesheet" href="https://cdn.elemecdn.com/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    <!-- Chart.js 使用多重备用CDN确保加载成功 -->
+    <script>
+        // 动态加载 Chart.js，带备用CDN
+        function loadChartJS(callback) {
+            if (typeof Chart !== 'undefined') {
+                callback();
+                return;
+            }
+
+            const cdnList = [
+                'https://cdn.elemecdn.com/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+                'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js',
+                'https://unpkg.com/chart.js@4.4.0/dist/chart.umd.min.js'
+            ];
+
+            let currentIndex = 0;
+
+            function tryLoad() {
+                if (currentIndex >= cdnList.length) {
+                    console.error('所有CDN都加载失败');
+                    callback();
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = cdnList[currentIndex];
+                script.onload = () => {
+                    console.log('Chart.js 加载成功:', cdnList[currentIndex]);
+                    setTimeout(callback, 100);
+                };
+                script.onerror = () => {
+                    console.warn('CDN加载失败，尝试下一个:', cdnList[currentIndex]);
+                    currentIndex++;
+                    tryLoad();
+                };
+                document.head.appendChild(script);
+            }
+
+            tryLoad();
+        }
+    </script>
     <style>
         * {
             margin: 0;
@@ -601,7 +639,9 @@
             <!-- 中间结果区 -->
             <div class="result-panel">
                 <h3><i class="ti ti-chart-bar"></i> 成本构成</h3>
-                <canvas id="costChart" width="300" height="150" style="max-height: 150px;"></canvas>
+                <div style="min-height: 180px;">
+                    <canvas id="costChart" width="300" height="150" style="max-height: 150px; width:100%;"></canvas>
+                </div>
                 <div id="costDetails"></div>
                 <div id="techDetails" class="badge-info"></div>
                 <div id="weightDetail" class="badge-info weight-highlight"></div>
@@ -774,14 +814,64 @@
     </div>
 
     <script>
-        // ==================== EmailJS 配置（已填入您的信息） ====================
+        // ==================== EmailJS 配置 ====================
         const EMAILJS_PUBLIC_KEY = '_GLnVIfbc_r_lJr4h';
         const EMAILJS_SERVICE_ID = 'service_k9pd6j8';
         const EMAILJS_TEMPLATE_ID = 'template_1c7iq8s';
         const RECIPIENT_EMAIL = 'caiyiheige@outlook.com';
 
-        // 初始化 EmailJS
-        emailjs.init(EMAILJS_PUBLIC_KEY);
+        let chartLoaded = false;
+        let emailjsLoaded = false;
+        let xlsxLoaded = false;
+
+        // 等待Chart.js加载完成
+        function waitForChart(callback) {
+            if (typeof Chart !== 'undefined') {
+                chartLoaded = true;
+                callback();
+                return;
+            }
+            setTimeout(() => waitForChart(callback), 200);
+        }
+
+        // 懒加载 EmailJS
+        async function loadEmailJS() {
+            if (emailjsLoaded) return;
+            if (typeof emailjs !== 'undefined') {
+                emailjsLoaded = true;
+                return;
+            }
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.elemecdn.com/npm/@emailjs/browser@4/dist/email.min.js';
+                script.onload = () => {
+                    if (typeof emailjs !== 'undefined') emailjs.init(EMAILJS_PUBLIC_KEY);
+                    emailjsLoaded = true;
+                    resolve();
+                };
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        // 懒加载 SheetJS
+        async function loadSheetJS() {
+            if (xlsxLoaded) return;
+            if (typeof XLSX !== 'undefined') {
+                xlsxLoaded = true;
+                return;
+            }
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.elemecdn.com/npm/xlsx@0.20.2/dist/xlsx.full.min.js';
+                script.onload = () => {
+                    xlsxLoaded = true;
+                    resolve();
+                };
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
 
         // ==================== 默认数据 ====================
         let materialsData = [
@@ -824,6 +914,12 @@
 
         // ==================== 发送邮件通知 ====================
         async function sendFeedbackEmail(type, content, contact) {
+            await loadEmailJS();
+            if (typeof emailjs === 'undefined') {
+                showToast('⚠️ 邮件服务未加载，反馈已保存', true);
+                return false;
+            }
+
             const typeText = type === 'suggestion' ? '💡 功能建议' : (type === 'issue' ? '🐛 问题反馈' : '📝 其他意见');
 
             const templateParams = {
@@ -1081,14 +1177,12 @@
         function openSurfaceModal() { renderSurfaceModal(); document.getElementById('surfaceModal').style.display = 'flex'; }
         function closeSurfaceModal() { document.getElementById('surfaceModal').style.display = 'none'; }
 
-        // ==================== 反馈管理（带邮件通知） ====================
+        // ==================== 反馈管理 ====================
         function addFeedback(type, content, contact) {
             let feedback = { id: Date.now(), type: type, content: content, contact: contact || "", time: new Date().toLocaleString('zh-CN') };
             feedbackList.unshift(feedback);
             saveFeedback();
             renderFeedbackList();
-
-            // 发送邮件通知
             sendFeedbackEmail(type, content, contact);
         }
 
@@ -1277,10 +1371,30 @@
             container.innerHTML = html;
         }
 
+        // ==================== 更新图表 ====================
+        function updateChart(costItems) {
+            if (!chartLoaded) {
+                setTimeout(() => updateChart(costItems), 200);
+                return;
+            }
+            if (typeof Chart === 'undefined') {
+                console.warn('Chart.js still not loaded');
+                return;
+            }
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+            let ctx = document.getElementById('costChart').getContext('2d');
+            if (ctx) {
+                chartInstance = new Chart(ctx, {
+                    type: 'pie',
+                    data: { labels: costItems.map(i => i.name), datasets: [{ data: costItems.map(i => i.val), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec489a', '#06b6d4'] }] },
+                    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom' } } }
+                });
+            }
+        }
+
         // ==================== 核心计算函数 ====================
         function calculate() {
             try {
-                // 数据验证和默认值兜底
                 if (materialsData.length === 0) {
                     materialsData = [
                         { MaterialCode: "PP+EPDM-T20", Density: 1.05, UnitPrice: 8.5 },
@@ -1332,7 +1446,6 @@
                 let projAreaCm2 = (length * width) / 100;
                 calcDetails.push(`📐 投影面积: ${length}×${width} = ${length * width} mm² = ${projAreaCm2.toFixed(1)} cm²`);
 
-                // 重量计算
                 let partWeightG = 0;
                 if (weightMethod === 'manual' && !isNaN(manualNetWeight) && manualNetWeight > 0) {
                     partWeightG = manualNetWeight;
@@ -1349,11 +1462,9 @@
                 currentPartWeightG = partWeightG;
                 let partWeightKg = partWeightG / 1000;
 
-                // 材料成本
                 let materialCost = partWeightKg * matPrice * (1 + wasteRate);
                 calcDetails.push(`💰 材料费: ${partWeightKg.toFixed(3)} kg × ${matPrice} 元/kg × (1+${(wasteRate * 100).toFixed(0)}%) = ${materialCost.toFixed(2)} 元`);
 
-                // 模具费计算
                 let moldLen = length + 150, moldWid = width + 150;
                 let moldAreaCm2 = (moldLen * moldWid) / 100;
                 let moldBasePrice = { 标准模架: 60, 精密模架: 90, 细水口模架: 70, 简化型模架: 45 }[moldBase] || 60;
@@ -1396,7 +1507,6 @@
                 calcDetails.push(`   模具总价: ${totalMoldPrice.toFixed(0)} 元`);
                 calcDetails.push(`   供应商分摊比例: ${(supplierRatio * 100).toFixed(0)}% → 单件分摊: ${perPartMold.toFixed(2)} 元`);
 
-                // 制造成本
                 let requiredTon = projAreaCm2 * 0.5 * cavity * 1.2;
                 let equipTonnage = 850;
                 for (let eq of equipmentDB) { if (requiredTon <= eq.maxForce) { equipTonnage = eq.tonnage; break; } }
@@ -1412,7 +1522,6 @@
                 calcDetails.push(`   设备费率: ${equipmentRate}元/小时, 人工费率: ${laborRate}元/小时`);
                 calcDetails.push(`   单件制造成本: (${equipmentRate}+${laborRate}) / ${hourlyOutput.toFixed(0)} = ${mfgCost.toFixed(3)} 元`);
 
-                // 表面处理
                 let surfaceMultiplier = { '常规': 1.2, '细纹': 1.3, '高光': 1.4, '皮纹': 1.5, '镜面': 1.6 }[surfaceGrade] || 1.5;
                 let surfaceAreaDm2 = (projAreaCm2 * surfaceMultiplier) / 100;
                 let surfParams = getSurfaceParams(surfaceProcess);
@@ -1427,7 +1536,6 @@
                     calcDetails.push(`   无表面处理`);
                 }
 
-                // 物流费
                 let theoreticalFreight = ratePerTonKm * partWeightKg * logisticsDistance;
                 let actualTruckFreight = Math.max(theoreticalFreight, minFreight);
                 let freightPerPart = actualTruckFreight / fullLoadQty;
@@ -1439,7 +1547,6 @@
                 calcDetails.push(`   满载件数: ${fullLoadQty.toLocaleString()} 件/车 → 运费分摊: ${actualTruckFreight.toFixed(2)} / ${fullLoadQty} = ${freightPerPart.toFixed(3)} 元/件`);
                 calcDetails.push(`   装卸杂费: ${handlingFee} 元/件 → 单件物流费: ${freightPerPart.toFixed(3)} + ${handlingFee} = ${logisticsCost.toFixed(3)} 元`);
 
-                // 管理费和利润
                 let managementBase = materialCost + mfgCost + perPartMold + surfaceCost + logisticsCost;
                 let managementCost = managementBase * 0.15;
                 let totalCost = managementBase + managementCost;
@@ -1455,7 +1562,6 @@
 
                 renderCalcDetails(calcDetails);
 
-                // 更新UI
                 document.getElementById('totalCostVal').innerText = totalCost.toFixed(2) + ' 元';
                 document.getElementById('quotePriceVal').innerText = quotePrice.toFixed(2) + ' 元';
                 document.getElementById('equipAdvice').innerHTML = `推荐设备: ${equipTonnage}吨 | 锁模力: ${Math.round(requiredTon)}吨 | 负荷率: ${Math.round(requiredTon / equipTonnage * 100)}%`;
@@ -1471,14 +1577,7 @@
                 let html = ''; costItems.forEach(item => { html += `<div class="cost-card"><span>${item.name}</span><span>${item.val.toFixed(2)} 元</span></div>`; });
                 document.getElementById('costDetails').innerHTML = html;
 
-                if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
-                let ctx = document.getElementById('costChart').getContext('2d');
-                chartInstance = new Chart(ctx, {
-                    type: 'pie',
-                    data: { labels: costItems.map(i => i.name), datasets: [{ data: costItems.map(i => i.val), backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec489a', '#06b6d4'] }] },
-                    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom' } } }
-                });
-
+                updateChart(costItems);
                 addToHistory();
 
             } catch (e) {
@@ -1488,19 +1587,23 @@
             }
         }
 
-        // ==================== 导出Excel（增强版） ====================
-        function exportToExcel() {
+        // ==================== 导出Excel（懒加载） ====================
+        async function exportToExcel() {
             try {
+                await loadSheetJS();
+                if (typeof XLSX === 'undefined') {
+                    alert('Excel导出库加载失败，请刷新页面重试');
+                    return;
+                }
+
                 let partName = document.getElementById('partName').value;
 
-                // 获取计算明细
                 let calcDetailsText = '';
                 const calcDetailLines = document.querySelectorAll('#calcDetails .calc-detail-line');
                 if (calcDetailLines.length > 0) {
                     calcDetailsText = Array.from(calcDetailLines).map(line => line.innerText).join('\n');
                 }
 
-                // 输入参数
                 const inputParams = [
                     ['零件名称', document.getElementById('partName').value],
                     ['生产基地', document.getElementById('region').value],
@@ -1533,7 +1636,6 @@
                     ['计算时间', new Date().toLocaleString()]
                 ];
 
-                // 成本结果
                 const costResults = [
                     ['成本项', '金额(元)'],
                     ['材料费', document.querySelector('#costDetails .cost-card:first-child span:last-child')?.innerText || '0'],
@@ -1551,17 +1653,13 @@
                 ];
 
                 const wb = XLSX.utils.book_new();
-
-                // 工作表1：计算明细
                 const detailRows = calcDetailsText.split('\n').map(line => [line]);
                 const detailSheet = XLSX.utils.aoa_to_sheet(detailRows);
                 XLSX.utils.book_append_sheet(wb, detailSheet, '计算明细');
 
-                // 工作表2：输入参数
                 const paramSheet = XLSX.utils.aoa_to_sheet(inputParams);
                 XLSX.utils.book_append_sheet(wb, paramSheet, '输入参数');
 
-                // 工作表3：成本结果
                 const resultSheet = XLSX.utils.aoa_to_sheet(costResults);
                 XLSX.utils.book_append_sheet(wb, resultSheet, '成本结果');
 
@@ -1592,10 +1690,17 @@
 
         // ==================== 初始化 ====================
         function init() {
-            loadFromStorage();
-            loadCustomRates();
-            refreshSelects();
-            renderHistoryList();
+            // 先加载 Chart.js
+            loadChartJS(() => {
+                chartLoaded = true;
+                console.log('Chart.js ready');
+                // 加载完成后初始化其他内容
+                loadFromStorage();
+                loadCustomRates();
+                refreshSelects();
+                renderHistoryList();
+                calculate();
+            });
 
             // 绑定事件
             document.getElementById('calcBtn').onclick = calculate;
@@ -1613,14 +1718,12 @@
             document.getElementById('customLaborRate').oninput = () => { saveCustomRates(); calculate(); };
             document.getElementById('clearHistoryBtn').onclick = clearHistory;
 
-            // 输入联动
             let autoIds = ['length', 'width', 'height', 'thickness', 'cavityCount', 'lifecycleQty', 'partialRatio', 'netWeight', 'wasteRate',
                 'logisticsDistance', 'ratePerTonKm', 'minFreight', 'fullLoadQty', 'handlingFee', 'partGeometry',
                 'region', 'materialSelect', 'surfaceProcess', 'surfaceGrade', 'moldBaseType', 'cavityComplex',
                 'slideMedium', 'lifterMedium', 'hotRunnerPoints', 'hotRunnerBrand', 'lifeRequirement'];
             autoIds.forEach(id => { let el = document.getElementById(id); if (el) { el.addEventListener('input', calculate); if (el.tagName === 'SELECT') el.addEventListener('change', calculate); } });
 
-            // 反馈
             document.getElementById('feedbackBtn').onclick = () => { document.getElementById('feedbackModal').style.display = 'flex'; };
             document.getElementById('viewFeedbackBtn').onclick = () => { renderFeedbackList(); document.getElementById('viewFeedbackModal').style.display = 'flex'; };
             document.getElementById('closeFeedbackModal').onclick = () => { document.getElementById('feedbackModal').style.display = 'none'; };
@@ -1640,7 +1743,6 @@
             document.getElementById('exportFeedbackBtn').onclick = exportFeedbackToCSV;
             document.getElementById('clearAllFeedbackBtn').onclick = clearAllFeedback;
 
-            // 点击模态框背景关闭
             window.onclick = (event) => {
                 if (event.target === document.getElementById('materialModal')) closeMaterialModal();
                 if (event.target === document.getElementById('surfaceModal')) closeSurfaceModal();
@@ -1653,7 +1755,6 @@
             updateEquipmentRateVisibility();
             updateLaborRateVisibility();
             initCollapse();
-            calculate();
 
             showToast('工具已加载，欢迎使用！');
         }
