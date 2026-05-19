@@ -48,10 +48,19 @@
             transition: all 0.3s ease;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
             display: block;
+            position: relative;
+            overflow: hidden;
         }
         .tool-card:hover {
             transform: translateY(-8px);
             box-shadow: 0 20px 40px -10px rgba(0,0,0,0.2);
+        }
+        .tool-card.disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .tool-card.disabled:hover {
+            transform: none;
         }
         .tool-icon {
             font-size: 48px;
@@ -79,12 +88,29 @@
         .status-ready { background: #dcfce7; color: #15803d; }
         .status-coming { background: #fef3c7; color: #b45309; }
         .status-beta { background: #dbeafe; color: #1e40af; }
+        .tool-version {
+            font-size: 0.65rem;
+            color: #94a3b8;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e2e8f0;
+        }
         .footer {
             text-align: center;
             margin-top: 60px;
             color: white;
             font-size: 0.8rem;
             opacity: 0.7;
+        }
+        .update-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: #10b981;
+            color: white;
+            font-size: 0.6rem;
+            padding: 2px 8px;
+            border-radius: 20px;
         }
         @media (max-width: 768px) {
             .header h1 { font-size: 1.8rem; }
@@ -106,45 +132,50 @@
                 <div class="tool-title">注塑件成本模型</div>
                 <div class="tool-desc">塑料零件注塑成型成本估算，支持材料/模具/制造费用配置，包含详细计算明细和Excel导出</div>
                 <span class="tool-status status-ready">✅ 已上线</span>
+                <div class="tool-version">版本 V1.5 | 支持双模式重量计算</div>
             </a>
             
             <!-- 冲压件 - 已上线 -->
-               <a href="stamping/index.html" class="tool-card">
-               <div class="tool-icon">⚙️</div>
+            <a href="stamping/index.html" class="tool-card">
+                <div class="tool-icon">⚙️</div>
                 <div class="tool-title">冲压件成本模型</div>
-                <div class="tool-desc">钣金零件冲压成本估算，支持级进模/工程模/材料利用率计算</div>
-                <span class="tool-status status-coming">✅ 已上线</span>
-             </a>
-            </div>
+                <div class="tool-desc">钣金零件冲压成型成本估算，支持冲焊总成BOM、多厚度计算、废料回收、焊接配置</div>
+                <span class="tool-status status-ready">✅ 已上线</span>
+                <div class="tool-version">版本 V2.0 | 新增BOM表多厚度支持</div>
+                <div class="update-badge">NEW</div>
+            </a>
             
             <!-- 压铸件 - 开发中 -->
-            <div class="tool-card" style="cursor: not-allowed; opacity: 0.7;">
+            <div class="tool-card disabled">
                 <div class="tool-icon">🔥</div>
                 <div class="tool-title">压铸件成本模型</div>
                 <div class="tool-desc">铝/锌合金压铸成本估算，支持不同压铸机型号和模具寿命</div>
                 <span class="tool-status status-coming">🔄 开发中</span>
+                <div class="tool-version">预计 V2.5 上线</div>
             </div>
             
             <!-- 表面处理 - 开发中 -->
-            <div class="tool-card" style="cursor: not-allowed; opacity: 0.7;">
+            <div class="tool-card disabled">
                 <div class="tool-icon">🎨</div>
                 <div class="tool-title">表面处理成本模型</div>
                 <div class="tool-desc">喷漆/电镀/皮纹/IMD等表面处理成本估算</div>
                 <span class="tool-status status-coming">🔄 开发中</span>
+                <div class="tool-version">预计 V2.5 上线</div>
             </div>
             
             <!-- BOM成本汇总 - 规划中 -->
-            <div class="tool-card" style="cursor: not-allowed; opacity: 0.7;">
+            <div class="tool-card disabled">
                 <div class="tool-icon">📊</div>
                 <div class="tool-title">BOM成本汇总工具</div>
                 <div class="tool-desc">整合各零件成本，生成完整BOM成本报表</div>
                 <span class="tool-status status-coming">📋 规划中</span>
+                <div class="tool-version">预计 V3.0 上线</div>
             </div>
         </div>
         
         <div class="footer">
-            <p>💡 提示：点击「注塑件成本模型」进入工具 | 数据存储在本地浏览器中，安全可靠</p>
-            <p style="margin-top: 12px;">© 2024 汽车成本计算工具箱 | 反馈建议请在工具内提交</p>
+            <p>💡 提示：点击「注塑件成本模型」或「冲压件成本模型」进入工具 | 数据存储在本地浏览器中，安全可靠</p>
+            <p style="margin-top: 12px;">© 2025 汽车成本计算工具箱 | 反馈建议请在工具内提交 | 持续更新中</p>
         </div>
     </div>
 </body>
