@@ -1,17 +1,2 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>冲压件成本模型</title>
-    <style>
-        body { font-family: system-ui; padding: 40px; text-align: center; }
-        .success { color: green; font-size: 24px; margin-bottom: 20px; }
-        .info { color: #666; margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <div class="success">✅ 冲压件成本模型已部署成功！</div>
-    <div class="info">如果看到此页面，说明文件路径正确。</div>
-    <div class="info">请将完整版代码替换到此文件。</div>
-</body>
-</html>
+html
+<h1>Stamping folder works!</h1>
