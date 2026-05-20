@@ -16,7 +16,7 @@
         .header-actions { display: flex; gap: 10px; }
         .dashboard { display: flex; gap: 20px; flex-wrap: wrap; }
         .input-panel, .result-panel, .data-panel { background: white; border-radius: 24px; padding: 20px; border: 1px solid #e9eef3; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
-        .input-panel { flex: 1.3; min-width: 480px; }
+        .input-panel { flex: 1.3; min-width: 520px; }
         .result-panel { flex: 1.5; min-width: 360px; }
         .data-panel { flex: 1.0; min-width: 280px; display: flex; flex-direction: column; gap: 20px; }
         .form-group { margin-bottom: 16px; }
@@ -62,14 +62,15 @@
         .summary-item { text-align: center; }
         .summary-item .label { font-size: 0.65rem; color: #5b6e8c; }
         .summary-item .value { font-size: 1rem; font-weight: 600; color: #1e293b; }
+        .auto-calc-panel { background: #f1f5f9; border-radius: 16px; padding: 16px; margin-top: 12px; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="header">
         <div class="title">
-            <h1><i class="ti ti-factory"></i> 冲压件成本模型 V2.0</h1>
-            <p>钣金零件冲压成型成本估算 | 支持冲焊总成BOM | 多厚度计算 | 废料回收 | 焊接配置</p>
+            <h1><i class="ti ti-factory"></i> 冲压件成本模型 V2.1</h1>
+            <p>钣金零件冲压成型成本估算 | 支持冲焊总成BOM | 自动吨位计算 | 材料强度库 | 多厚度支持</p>
         </div>
         <div class="header-actions">
             <button class="outline" id="viewFeedbackBtn"><i class="ti ti-message-circle"></i> 查看反馈</button>
@@ -155,16 +156,84 @@
                 <div class="form-group" id="partialRatioGroup" style="display:none;"><label>供应商分摊 (%)</label><input type="number" id="partialRatio" value="50"></div>
             </div>
 
-            <!-- 冲压设备配置 -->
+            <!-- 冲压设备配置（优化版） -->
             <div class="section-title">🏭 冲压设备配置</div>
             <div class="row-2">
-                <div class="form-group"><label>设备吨位</label><select id="pressTonnage"><option value="160">160吨</option><option value="250">250吨</option><option value="400" selected>400吨</option><option value="630">630吨</option><option value="800">800吨</option><option value="1000">1000吨</option><option value="1250">1250吨</option><option value="1600">1600吨</option><option value="2000">2000吨</option><option value="custom">自定义</option></select></div>
-                <div id="customTonnageGroup" style="display:none;"><label>自定义吨位</label><input type="number" id="customPressTonnage" value="300"></div>
-                <div class="form-group"><label>冲次 (SPM)</label><input type="number" id="strokePerMinute" value="35" step="5"></div>
-                <div class="form-group"><label>设备费率 (元/小时)</label><input type="number" id="equipmentRate" value="120" step="10"></div>
-                <div class="form-group"><label>人工费率 (元/小时)</label><input type="number" id="laborRate" value="38" step="5"></div>
-                <div class="form-group"><label>换模时间 (分钟)</label><input type="number" id="changeoverTime" value="30" step="5"></div>
-                <div class="form-group"><label>批量 (件/批次)</label><input type="number" id="batchSize" value="5000" step="500"></div>
+                <div class="form-group"><label>吨位选择方式</label>
+                    <select id="tonnageMode">
+                        <option value="auto">🤖 自动计算（推荐）</option>
+                        <option value="manual">✋ 手动选择</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 自动计算模式面板 -->
+            <div id="autoTonnagePanel" class="auto-calc-panel" style="display:none;">
+                <div class="row-2">
+                    <div class="form-group">
+                        <label>冲裁周长 (mm)</label>
+                        <div class="row-2" style="gap: 6px;">
+                            <input type="number" id="perimeterAuto" placeholder="自动计算" readonly style="background:#f3f4f6;">
+                            <button class="outline small" id="calcPerimeterBtn" type="button">📐 重新计算</button>
+                        </div>
+                        <div class="info-tip" id="perimeterSource">周长来源：自动估算</div>
+                    </div>
+                    <div class="form-group">
+                        <label>手动输入周长 (mm)</label>
+                        <input type="number" id="perimeterManual" placeholder="手动输入，覆盖自动计算值" step="10">
+                        <div class="info-tip">💡 从图纸获取精确周长，可提高计算精度</div>
+                    </div>
+                </div>
+                <div class="row-2">
+                    <div class="form-group">
+                        <label>材料牌号(强度库)</label>
+                        <select id="materialStrengthSelect"></select>
+                        <button class="outline small" id="openStrengthModalBtn" style="margin-top:4px;">✏️ 维护强度库</button>
+                    </div>
+                    <div class="form-group">
+                        <label>材料厚度 (mm)</label>
+                        <input type="number" id="thicknessForCalc" readonly style="background:#f3f4f6;">
+                    </div>
+                </div>
+                <div class="row-2">
+                    <div class="form-group">
+                        <label>安全系数</label>
+                        <input type="number" id="safetyFactor" value="1.3" step="0.05" min="1.0" max="2.0">
+                    </div>
+                    <div class="form-group">
+                        <label>冲裁力 (kN)</label>
+                        <input type="text" id="calcForceDisplay" readonly style="background:#f3f4f6;">
+                    </div>
+                </div>
+                <div class="row-2">
+                    <div class="form-group">
+                        <label>计算吨位 (吨)</label>
+                        <input type="text" id="calcTonnageDisplay" readonly style="background:#f3f4f6; font-weight:bold; color:#2563eb;">
+                    </div>
+                    <div class="form-group">
+                        <label>推荐设备吨位</label>
+                        <select id="recommendedTonnage"></select>
+                        <button class="outline small" id="applyTonnageBtn" style="margin-top:4px;">✓ 应用此吨位</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 手动选择模式面板 -->
+            <div id="manualTonnagePanel">
+                <div class="row-2">
+                    <div class="form-group"><label>设备吨位</label><select id="pressTonnage">
+                        <option value="160">160吨</option><option value="250">250吨</option><option value="400" selected>400吨</option>
+                        <option value="630">630吨</option><option value="800">800吨</option><option value="1000">1000吨</option>
+                        <option value="1250">1250吨</option><option value="1600">1600吨</option><option value="2000">2000吨</option>
+                        <option value="custom">自定义</option>
+                    </select></div>
+                    <div id="customTonnageGroup" style="display:none;"><label>自定义吨位</label><input type="number" id="customPressTonnage" value="300"></div>
+                    <div class="form-group"><label>设备费率 (元/小时)</label><input type="number" id="equipmentRate" value="120" step="10"></div>
+                    <div class="form-group"><label>人工费率 (元/小时)</label><input type="number" id="laborRate" value="38" step="5"></div>
+                    <div class="form-group"><label>冲次 (SPM)</label><input type="number" id="strokePerMinute" value="35" step="5"></div>
+                    <div class="form-group"><label>换模时间 (分钟)</label><input type="number" id="changeoverTime" value="30" step="5"></div>
+                    <div class="form-group"><label>批量 (件/批次)</label><input type="number" id="batchSize" value="5000" step="500"></div>
+                </div>
             </div>
 
             <!-- 冲焊总成BOM表（可折叠） -->
@@ -213,9 +282,6 @@
                         <div class="summary-item"><span class="label">BOM总重量</span><div class="value" id="totalBomWeight">0 g</div></div>
                         <div class="summary-item"><span class="label">平均利用率</span><div class="value" id="avgUtilization">0%</div></div>
                         <div class="summary-item"><span class="label">BOM材料费</span><div class="value" id="totalBomMaterialCost">0 元</div></div>
-                    </div>
-                    <div class="info-tip" style="margin-top: 8px;">
-                        ✅ 启用BOM表后，将自动汇总重量和材料费，替代上方单件重量计算
                     </div>
                 </div>
             </div>
@@ -295,14 +361,19 @@
         <div class="data-panel">
             <div><h4><i class="ti ti-package"></i> 板材价格库 <button class="outline" id="openMaterialModalBtn" style="float:right;">维护</button></h4><div style="max-height:200px; overflow-y:auto;"><table class="table-mini"><tbody id="materialPreviewBody"></tbody></table></div></div>
             <div><h4><i class="ti ti-wifi"></i> 焊接单价库 <button class="outline" id="openWeldModalBtn" style="float:right;">维护</button></h4><div style="max-height:180px; overflow-y:auto;"><table class="table-mini"><tbody id="weldPreviewBody"></tbody></table></div></div>
-            <div><h4><i class="ti ti-database"></i> 设备吨位参考</h4><div style="font-size:12px; background:#f8fafc; padding:12px; border-radius:16px;">160T: 小件<br>250-400T: 内板<br>630-1000T: 门板<br>1250-2000T: 侧围</div></div>
+            <div><h4><i class="ti ti-database"></i> 设备吨位参考</h4><div style="font-size:12px; background:#f8fafc; padding:12px; border-radius:16px;">
+                自动计算: 冲裁力(kN)=周长×厚度×强度×1.3/1000<br>
+                标准吨位: 25-2500吨系列<br>
+                常用强度: 低碳钢320, 高强钢520
+            </div></div>
         </div>
     </div>
 </div>
 
 <!-- 模态框 -->
-<div id="materialModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>板材价格库</h3><button class="outline" id="closeMaterialModal">✕</button></div><table class="table-mini"><thead><tr><th>牌号</th><th>类型</th><th>规格</th><th>单价</th><th>操作</th></tr></thead><tbody id="materialTableBody"></tbody></tr><div class="inline-form"><select id="newMatType"><option>热轧</option><option>冷轧</option><option>高强钢</option><option>镀锌</option></select><input type="text" id="newMatCode" placeholder="牌号"><input type="text" id="newMatSpec" placeholder="规格"><input type="number" id="newMatPrice" placeholder="单价" step="0.1"><button class="primary" id="addMaterialBtn">添加</button></div></div></div>
+<div id="materialModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>板材价格库</h3><button class="outline" id="closeMaterialModal">✕</button></div><table class="table-mini"><thead><tr><th>牌号</th><th>类型</th><th>规格</th><th>单价</th><th>操作</th></td></thead><tbody id="materialTableBody"></tbody></table><div class="inline-form"><select id="newMatType"><option>热轧</option><option>冷轧</option><option>高强钢</option><option>镀锌</option></select><input type="text" id="newMatCode" placeholder="牌号"><input type="text" id="newMatSpec" placeholder="规格"><input type="number" id="newMatPrice" placeholder="单价" step="0.1"><button class="primary" id="addMaterialBtn">添加</button></div></div></div>
 <div id="weldModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>焊接单价库</h3><button class="outline" id="closeWeldModal">✕</button></div><table class="table-mini"><thead><tr><th>类型</th><th>单位</th><th>单价</th><th>操作</th></tr></thead><tbody id="weldTableBody"></tbody></table><div class="inline-form"><select id="newWeldTypeSelect"><option value="spot">点焊</option><option value="mig">二保焊</option><option value="tig">氩弧焊</option><option value="laser">激光焊</option><option value="projection">凸焊</option><option value="robot">机器人焊接</option></select><input type="number" id="newWeldRate" placeholder="单价" step="0.05"><input type="text" id="newWeldUnit" placeholder="单位" value="元/点"><button class="primary" id="addWeldRateBtn">添加</button></div></div></div>
+<div id="strengthModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>材料强度库管理</h3><button class="outline" id="closeStrengthModal">✕</button></div><div class="info-tip" style="margin-bottom:12px;">冲裁力计算所需的材料抗剪强度 (MPa)</div><table class="table-mini"><thead><tr><th>材料牌号</th><th>抗剪强度(MPa)</th><th>操作</th></tr></thead><tbody id="strengthTableBody"></tbody></table><div class="inline-form"><input type="text" id="newStrengthCode" placeholder="牌号" style="flex:2;"><input type="number" id="newStrengthValue" placeholder="强度(MPa)" step="10" style="flex:1;"><button class="primary" id="addStrengthBtn">添加</button></div><div class="info-tip" style="margin-top:12px;">参考值：低碳钢320-400，高强钢450-600，不锈钢500-600，铝合金200-280</div></div></div>
 <div id="feedbackModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>意见反馈</h3><button class="outline" id="closeFeedbackModal">✕</button></div><div class="form-group"><label>类型</label><select id="feedbackType"><option value="suggestion">功能建议</option><option value="issue">问题反馈</option></select></div><div class="form-group"><label>内容</label><textarea id="feedbackContent" rows="4"></textarea></div><div class="form-group"><label>联系方式</label><input type="text" id="feedbackContact"></div><div style="display:flex;gap:12px;"><button class="outline" id="cancelFeedbackBtn">取消</button><button class="primary" id="submitFeedbackBtn">提交</button></div></div></div>
 <div id="viewFeedbackModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>反馈列表</h3><button class="outline" id="closeViewModal">✕</button></div><div id="feedbackList"></div><button class="outline" id="exportFeedbackBtn">导出CSV</button><button class="outline danger" id="clearAllFeedbackBtn">清空</button></div></div>
 
@@ -318,6 +389,7 @@ let stampingMaterialsData = [
     { id: "ga1", MaterialCode: "DX51D+Z", Type: "镀锌", Spec: "0.4-3.0mm", Thickness: 0.8, Density: 7.85, UnitPrice: 6.2 }
 ];
 
+// ==================== 焊接单价库 ====================
 let weldPriceData = [
     { id: "w1", WeldType: "spot", DisplayName: "点焊", Unit: "元/点", DefaultPrice: 0.25 },
     { id: "w2", WeldType: "mig", DisplayName: "二保焊", Unit: "元/cm", DefaultPrice: 0.10 },
@@ -325,6 +397,20 @@ let weldPriceData = [
     { id: "w4", WeldType: "laser", DisplayName: "激光焊", Unit: "元/cm", DefaultPrice: 0.45 },
     { id: "w5", WeldType: "projection", DisplayName: "凸焊", Unit: "元/个", DefaultPrice: 0.30 },
     { id: "w6", WeldType: "robot", DisplayName: "机器人焊接", Unit: "元/小时", DefaultPrice: 180 }
+];
+
+// ==================== 材料强度库 ====================
+let materialStrengthData = [
+    { id: "ms1", MaterialCode: "Q235A", Strength: 350, Type: "普通钢" },
+    { id: "ms2", MaterialCode: "510L", Strength: 420, Type: "大梁钢" },
+    { id: "ms3", MaterialCode: "QSTE500TM", Strength: 550, Type: "高强钢" },
+    { id: "ms4", MaterialCode: "DC01", Strength: 320, Type: "冷轧钢" },
+    { id: "ms5", MaterialCode: "DC03", Strength: 340, Type: "冷轧钢" },
+    { id: "ms6", MaterialCode: "HC340/590DP", Strength: 520, Type: "高强钢" },
+    { id: "ms7", MaterialCode: "DX51D+Z", Strength: 360, Type: "镀锌板" },
+    { id: "ms8", MaterialCode: "SUS304", Strength: 550, Type: "不锈钢" },
+    { id: "ms9", MaterialCode: "6061铝合金", Strength: 240, Type: "铝合金" },
+    { id: "ms10", MaterialCode: "5083铝合金", Strength: 250, Type: "铝合金" }
 ];
 
 let bomItems = [];
@@ -338,15 +424,180 @@ let currentMaterialCost = 0;
 function loadFromStorage() {
     let m = localStorage.getItem('stamping_materials'); if (m) stampingMaterialsData = JSON.parse(m);
     let w = localStorage.getItem('stamping_weld'); if (w) weldPriceData = JSON.parse(w);
+    let s = localStorage.getItem('stamping_strength'); if (s) materialStrengthData = JSON.parse(s);
     let b = localStorage.getItem('stamping_bom'); if (b) bomItems = JSON.parse(b);
     let f = localStorage.getItem('stamping_feedback'); if (f) feedbackList = JSON.parse(f);
     let h = localStorage.getItem('stamping_history'); if (h) historyList = JSON.parse(h);
 }
 function saveMaterials() { localStorage.setItem('stamping_materials', JSON.stringify(stampingMaterialsData)); }
 function saveWeldData() { localStorage.setItem('stamping_weld', JSON.stringify(weldPriceData)); }
+function saveStrengthData() { localStorage.setItem('stamping_strength', JSON.stringify(materialStrengthData)); }
 function saveBomData() { localStorage.setItem('stamping_bom', JSON.stringify(bomItems)); }
 function saveFeedback() { localStorage.setItem('stamping_feedback', JSON.stringify(feedbackList)); }
 function saveHistory() { localStorage.setItem('stamping_history', JSON.stringify(historyList.slice(0, 10))); }
+
+// ==================== 材料强度库函数 ====================
+function getMaterialStrength(materialCode) {
+    let found = materialStrengthData.find(m => m.MaterialCode === materialCode);
+    return found ? found.Strength : 350;
+}
+
+function refreshStrengthSelect() {
+    let select = document.getElementById('materialStrengthSelect');
+    if (select && materialStrengthData.length > 0) {
+        let currentVal = select.value;
+        select.innerHTML = '';
+        materialStrengthData.forEach(m => {
+            let opt = new Option(`${m.MaterialCode} (${m.Strength} MPa)`, m.MaterialCode);
+            select.appendChild(opt);
+        });
+        if (currentVal && materialStrengthData.some(m => m.MaterialCode === currentVal)) select.value = currentVal;
+        else select.value = materialStrengthData[0]?.MaterialCode;
+    }
+}
+
+function renderStrengthModal() {
+    let tbody = document.getElementById('strengthTableBody');
+    tbody.innerHTML = '';
+    materialStrengthData.forEach((s, idx) => {
+        let row = tbody.insertRow();
+        row.insertCell(0).innerHTML = `<input type="text" value="${s.MaterialCode}" class="str-code-${idx}" style="width:140px">`;
+        row.insertCell(1).innerHTML = `<input type="number" value="${s.Strength}" class="str-value-${idx}" step="10" style="width:100px">`;
+        row.insertCell(2).innerHTML = `<span class="edit-icon" data-idx="${idx}" data-type="strength">💾</span> <span class="delete-icon" data-idx="${idx}" data-type="strength">🗑️</span>`;
+    });
+    document.querySelectorAll('#strengthTableBody .edit-icon').forEach(el => {
+        el.onclick = () => {
+            let idx = parseInt(el.dataset.idx);
+            let newCode = document.querySelector(`.str-code-${idx}`)?.value;
+            let newValue = parseFloat(document.querySelector(`.str-value-${idx}`)?.value);
+            if (newCode) materialStrengthData[idx].MaterialCode = newCode;
+            if (!isNaN(newValue)) materialStrengthData[idx].Strength = newValue;
+            saveStrengthData(); refreshStrengthSelect(); calculateTonnage(); showToast('强度已保存');
+        };
+    });
+    document.querySelectorAll('#strengthTableBody .delete-icon').forEach(el => {
+        el.onclick = () => {
+            if (confirm('删除？')) {
+                materialStrengthData.splice(parseInt(el.dataset.idx), 1);
+                if (materialStrengthData.length === 0) materialStrengthData.push({ id: "ms1", MaterialCode: "Q235A", Strength: 350, Type: "普通钢" });
+                saveStrengthData(); refreshStrengthSelect(); calculateTonnage(); showToast('已删除');
+            }
+        };
+    });
+}
+
+// ==================== 吨位自动计算 ====================
+function calculatePerimeter() {
+    let method = document.getElementById('weightMethod').value;
+    let manualPerimeter = parseFloat(document.getElementById('perimeterManual').value);
+    
+    if (!isNaN(manualPerimeter) && manualPerimeter > 0) {
+        document.getElementById('perimeterSource').innerHTML = '周长来源：用户手动输入';
+        document.getElementById('perimeterAuto').value = manualPerimeter;
+        return manualPerimeter;
+    }
+    
+    let length = parseFloat(document.getElementById('length')?.value) || 0;
+    let width = parseFloat(document.getElementById('width')?.value) || 0;
+    let perimeter = 0;
+    let source = '';
+    
+    if (method === 'bom' && bomItems.length > 0) {
+        bomItems.forEach(item => {
+            if (item.length && item.width) {
+                perimeter += 2 * (item.length + item.width);
+            }
+        });
+        source = `BOM表累加 (${bomItems.length}个子零件)`;
+    } else if (length > 0 && width > 0) {
+        perimeter = 2 * (length + width);
+        source = '零件尺寸估算 (矩形近似)';
+    } else {
+        let projAreaCm2 = (length * width) / 100;
+        if (projAreaCm2 > 0) {
+            let areaMm2 = projAreaCm2 * 100;
+            let diameter = 2 * Math.sqrt(areaMm2 / Math.PI);
+            perimeter = Math.PI * diameter;
+            source = '投影面积等效圆估算';
+        } else {
+            perimeter = 500;
+            source = '默认估算 (500mm)';
+        }
+    }
+    
+    document.getElementById('perimeterSource').innerHTML = `周长来源：${source}`;
+    document.getElementById('perimeterAuto').value = perimeter;
+    return perimeter;
+}
+
+function calculateTonnage() {
+    let perimeter = calculatePerimeter();
+    let strengthSelect = document.getElementById('materialStrengthSelect');
+    let materialCode = strengthSelect.value;
+    let shearStrength = getMaterialStrength(materialCode);
+    
+    let materialId = document.getElementById('materialSelect').value;
+    let material = stampingMaterialsData.find(m => m.id === materialId);
+    let thickness = material ? material.Thickness : 1.0;
+    document.getElementById('thicknessForCalc').value = thickness;
+    
+    let safetyFactor = parseFloat(document.getElementById('safetyFactor').value) || 1.3;
+    let forceKN = (perimeter * thickness * shearStrength * safetyFactor) / 1000;
+    let requiredTons = forceKN / 9.8;
+    
+    const standardTonnages = [25, 40, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600, 2000, 2500];
+    let recommended = standardTonnages.find(t => t >= requiredTons) || standardTonnages[standardTonnages.length - 1];
+    
+    document.getElementById('calcForceDisplay').value = forceKN.toFixed(0) + ' kN';
+    document.getElementById('calcTonnageDisplay').value = requiredTons.toFixed(0) + ' 吨 → 推荐 ' + recommended + ' 吨';
+    
+    let recSelect = document.getElementById('recommendedTonnage');
+    recSelect.innerHTML = '';
+    standardTonnages.forEach(t => {
+        let opt = new Option(t + '吨', t);
+        if (t === recommended) opt.selected = true;
+        recSelect.appendChild(opt);
+    });
+    
+    return { forceKN, requiredTons, recommended, perimeter, thickness, shearStrength };
+}
+
+function applyRecommendedTonnage() {
+    let recSelect = document.getElementById('recommendedTonnage');
+    let selectedTonnage = parseInt(recSelect.value);
+    let pressSelect = document.getElementById('pressTonnage');
+    let optionExists = false;
+    for (let i = 0; i < pressSelect.options.length; i++) {
+        if (parseInt(pressSelect.options[i].value) === selectedTonnage) {
+            pressSelect.selectedIndex = i;
+            optionExists = true;
+            break;
+        }
+    }
+    if (!optionExists) {
+        pressSelect.value = 'custom';
+        document.getElementById('customPressTonnage').value = selectedTonnage;
+        updatePressTonnageVisibility();
+    }
+    showToast(`已应用推荐吨位: ${selectedTonnage}吨`);
+    calculate();
+}
+
+function updateTonnageMode() {
+    let mode = document.getElementById('tonnageMode').value;
+    let autoPanel = document.getElementById('autoTonnagePanel');
+    let manualPanel = document.getElementById('manualTonnagePanel');
+    
+    if (mode === 'auto') {
+        autoPanel.style.display = 'block';
+        manualPanel.style.display = 'none';
+        calculateTonnage();
+    } else {
+        autoPanel.style.display = 'none';
+        manualPanel.style.display = 'block';
+    }
+    calculate();
+}
 
 // ==================== UI刷新 ====================
 function refreshSelects() {
@@ -360,6 +611,7 @@ function refreshSelects() {
         updateMaterialInfo();
     }
     refreshNewPartMaterialSelect();
+    refreshStrengthSelect();
     renderBomTable();
 }
 
@@ -369,6 +621,9 @@ function updateMaterialInfo() {
     if (material) {
         document.getElementById('materialPrice').value = material.UnitPrice;
         document.getElementById('materialThickness').value = material.Thickness;
+    }
+    if (document.getElementById('tonnageMode').value === 'auto') {
+        calculateTonnage();
     }
 }
 
@@ -450,64 +705,19 @@ function renderBomTable() {
         bomItems.forEach((item, idx) => {
             let metrics = calculatePartMetrics(item);
             let row = tbody.insertRow();
-            
-            // 零件名称
-            let cell0 = row.insertCell(0);
-            cell0.innerHTML = `<input type="text" value="${escapeHtml(item.partName)}" class="bom-name-${idx}" style="width:95%; padding:4px;">`;
-            cell0.style.minWidth = '100px';
-            
-            // 数量
-            let cell1 = row.insertCell(1);
-            cell1.innerHTML = `<input type="number" value="${item.qty}" class="bom-qty-${idx}" step="1" style="width:60px; padding:4px; text-align:center;">`;
-            cell1.style.minWidth = '60px';
-            
-            // 材料牌号
-            let cell2 = row.insertCell(2);
-            cell2.innerHTML = `<select class="bom-material-${idx}" style="width:130px; padding:4px;">${renderMaterialOptions(item.materialCode)}</select>`;
-            cell2.style.minWidth = '140px';
-            
-            // 厚度
-            let cell3 = row.insertCell(3);
-            cell3.innerHTML = `<input type="number" value="${item.thickness}" class="bom-thickness-${idx}" step="0.1" style="width:70px; padding:4px; text-align:center;">`;
-            cell3.style.minWidth = '70px';
-            
-            // 长
-            let cell4 = row.insertCell(4);
-            cell4.innerHTML = `<input type="number" value="${item.length}" class="bom-length-${idx}" step="10" style="width:80px; padding:4px; text-align:center;">`;
-            cell4.style.minWidth = '80px';
-            
-            // 宽
-            let cell5 = row.insertCell(5);
-            cell5.innerHTML = `<input type="number" value="${item.width}" class="bom-width-${idx}" step="10" style="width:80px; padding:4px; text-align:center;">`;
-            cell5.style.minWidth = '80px';
-            
-            // 展开面积
-            let cell6 = row.insertCell(6);
-            cell6.innerHTML = `<span style="display:inline-block; width:100%; text-align:center;">${metrics.blankArea.toFixed(1)}</span>`;
-            cell6.style.minWidth = '90px';
-            
-            // 利用率
-            let cell7 = row.insertCell(7);
-            cell7.innerHTML = `<input type="number" value="${item.utilization || 75}" class="bom-util-${idx}" step="5" style="width:80px; padding:4px; text-align:center;">`;
-            cell7.style.minWidth = '80px';
-            
-            // 单件重量
-            let cell8 = row.insertCell(8);
-            cell8.innerHTML = `<span style="display:inline-block; width:100%; text-align:center;">${metrics.partWeight.toFixed(1)}</span>`;
-            cell8.style.minWidth = '90px';
-            
-            // 总重量
-            let cell9 = row.insertCell(9);
-            cell9.innerHTML = `<span style="display:inline-block; width:100%; text-align:center; font-weight:600;">${metrics.totalWeight.toFixed(1)}</span>`;
-            cell9.style.minWidth = '90px';
-            
-            // 操作
-            let cell10 = row.insertCell(10);
-            cell10.innerHTML = `<span class="edit-icon" data-idx="${idx}" data-type="bom" style="cursor:pointer;">💾</span> <span class="delete-icon" data-idx="${idx}" data-type="bom" style="cursor:pointer;">🗑️</span>`;
-            cell10.style.minWidth = '70px';
+            row.insertCell(0).innerHTML = `<input type="text" value="${escapeHtml(item.partName)}" class="bom-name-${idx}" style="width:95%; padding:4px;">`;
+            row.insertCell(1).innerHTML = `<input type="number" value="${item.qty}" class="bom-qty-${idx}" step="1" style="width:60px; padding:4px; text-align:center;">`;
+            row.insertCell(2).innerHTML = `<select class="bom-material-${idx}" style="width:130px; padding:4px;">${renderMaterialOptions(item.materialCode)}</select>`;
+            row.insertCell(3).innerHTML = `<input type="number" value="${item.thickness}" class="bom-thickness-${idx}" step="0.1" style="width:70px; padding:4px; text-align:center;">`;
+            row.insertCell(4).innerHTML = `<input type="number" value="${item.length}" class="bom-length-${idx}" step="10" style="width:80px; padding:4px; text-align:center;">`;
+            row.insertCell(5).innerHTML = `<input type="number" value="${item.width}" class="bom-width-${idx}" step="10" style="width:80px; padding:4px; text-align:center;">`;
+            row.insertCell(6).innerHTML = `<span>${metrics.blankArea.toFixed(1)}</span>`;
+            row.insertCell(7).innerHTML = `<input type="number" value="${item.utilization || 75}" class="bom-util-${idx}" step="5" style="width:80px; padding:4px; text-align:center;">`;
+            row.insertCell(8).innerHTML = `<span>${metrics.partWeight.toFixed(1)}</span>`;
+            row.insertCell(9).innerHTML = `<span style="font-weight:600;">${metrics.totalWeight.toFixed(1)}</span>`;
+            row.insertCell(10).innerHTML = `<span class="edit-icon" data-idx="${idx}" data-type="bom">💾</span> <span class="delete-icon" data-idx="${idx}" data-type="bom">🗑️</span>`;
         });
     }
-    
     attachBomEvents();
     updateBomSummary();
 }
@@ -518,6 +728,9 @@ function updateBomSummary() {
     document.getElementById('totalBomWeight').innerHTML = `${bomTotal.totalWeight.toFixed(1)} g`;
     document.getElementById('avgUtilization').innerHTML = `${bomTotal.avgUtilization.toFixed(1)}%`;
     document.getElementById('totalBomMaterialCost').innerHTML = `${bomTotal.totalMaterialCost.toFixed(2)} 元`;
+    if (document.getElementById('tonnageMode').value === 'auto') {
+        calculateTonnage();
+    }
 }
 
 function attachBomEvents() {
@@ -589,6 +802,32 @@ function calculatePartWeightAndCost() {
     }
 }
 
+function getSelectedTonnage() {
+    let mode = document.getElementById('tonnageMode').value;
+    if (mode === 'auto') {
+        let recSelect = document.getElementById('recommendedTonnage');
+        return parseInt(recSelect.value);
+    } else {
+        let pressTonnage = document.getElementById('pressTonnage').value;
+        if (pressTonnage === 'custom') return parseFloat(document.getElementById('customPressTonnage').value) || 400;
+        return parseFloat(pressTonnage);
+    }
+}
+
+function calculatePressCost() {
+    let pressTonnage = getSelectedTonnage();
+    let spm = parseFloat(document.getElementById('strokePerMinute').value) || 35;
+    let equipRate = parseFloat(document.getElementById('equipmentRate').value) || 120;
+    let laborRate = parseFloat(document.getElementById('laborRate').value) || 38;
+    let changeover = parseFloat(document.getElementById('changeoverTime').value) || 30;
+    let batch = parseFloat(document.getElementById('batchSize').value) || 5000;
+    let cycleSec = 60 / spm;
+    let changeoverPerPart = (changeover * 60) / batch;
+    let totalSec = cycleSec + changeoverPerPart;
+    let cost = (equipRate + laborRate) / 3600 * totalSec;
+    return { cost, tonnage: pressTonnage, spm, cycleSec };
+}
+
 function calculateDieCost(annualQty, projAreaCm2) {
     let dieType = document.getElementById('dieType').value;
     let dieLife = parseFloat(document.getElementById('dieLife').value) || 50;
@@ -603,22 +842,6 @@ function calculateDieCost(annualQty, projAreaCm2) {
     let totalPrice = basePrice * complexity * areaFactor * processFactor * Math.pow(lifeFactor, 0.6);
     let perPart = (totalPrice * supplierRatio) / annualQty;
     return { totalPrice, perPart };
-}
-
-function calculatePressCost() {
-    let pressTonnage = document.getElementById('pressTonnage').value;
-    if (pressTonnage === 'custom') pressTonnage = parseFloat(document.getElementById('customPressTonnage').value) || 400;
-    else pressTonnage = parseFloat(pressTonnage);
-    let spm = parseFloat(document.getElementById('strokePerMinute').value) || 35;
-    let equipRate = parseFloat(document.getElementById('equipmentRate').value) || 120;
-    let laborRate = parseFloat(document.getElementById('laborRate').value) || 38;
-    let changeover = parseFloat(document.getElementById('changeoverTime').value) || 30;
-    let batch = parseFloat(document.getElementById('batchSize').value) || 5000;
-    let cycleSec = 60 / spm;
-    let changeoverPerPart = (changeover * 60) / batch;
-    let totalSec = cycleSec + changeoverPerPart;
-    let cost = (equipRate + laborRate) / 3600 * totalSec;
-    return { cost, tonnage: pressTonnage, spm, cycleSec };
 }
 
 function calculateWeldCost() {
@@ -675,7 +898,6 @@ function calculate() {
         let materialCost = weightResult.materialCost;
         currentMaterialCost = materialCost;
         
-        // 废料回收扣减
         let scrapPrice = parseFloat(document.getElementById('scrapPrice').value) || 2.0;
         let scrapMethod = document.getElementById('scrapAccountingMethod').value;
         let scrapValue = (weightResult.materialWeight / 1000) * scrapPrice;
@@ -696,7 +918,6 @@ function calculate() {
         let totalCost = directCost + managementCost + profit;
         let quotePrice = totalCost * 1.13;
         
-        // 更新UI
         document.getElementById('totalCostVal').innerHTML = totalCost.toFixed(2) + ' 元';
         document.getElementById('quotePriceVal').innerHTML = quotePrice.toFixed(2) + ' 元';
         document.getElementById('weightDetail').innerHTML = `⚖️ ${weightResult.detail.join(' | ')} | 材料费: ${materialCost.toFixed(2)}元`;
@@ -749,10 +970,11 @@ function updateWeightMethod() {
     document.getElementById('netWeightGroup').style.display = method === 'netWeight' ? 'block' : 'none';
     document.getElementById('blankAreaGroup').style.display = method === 'blankArea' ? 'block' : 'none';
     document.getElementById('bomModeIndicator').style.display = method === 'bom' ? 'block' : 'none';
+    if (document.getElementById('tonnageMode').value === 'auto') calculateTonnage();
     calculate();
 }
 function updatePayment() { document.getElementById('partialRatioGroup').style.display = document.getElementById('diePayment').value === 'partial' ? 'block' : 'none'; calculate(); }
-function updatePressTonnage() { document.getElementById('customTonnageGroup').style.display = document.getElementById('pressTonnage').value === 'custom' ? 'block' : 'none'; calculate(); }
+function updatePressTonnageVisibility() { document.getElementById('customTonnageGroup').style.display = document.getElementById('pressTonnage').value === 'custom' ? 'block' : 'none'; calculate(); }
 function updateWeldType() {
     let type = document.getElementById('weldType').value;
     let isSpot = type === 'spot' || type === 'projection';
@@ -768,6 +990,7 @@ function updateWeldType() {
 function updateGauge() { document.getElementById('gaugeConfig').style.display = document.getElementById('needGauge').value === 'yes' ? 'block' : 'none'; calculate(); }
 function updateGaugeType() { document.getElementById('customGaugeGroup').style.display = document.getElementById('gaugeType').value === 'custom' ? 'block' : 'none'; calculate(); }
 function updateSurface() { document.getElementById('surfacePriceGroup').style.display = document.getElementById('surfaceProcess').value !== 'none' ? 'block' : 'none'; calculate(); }
+function refreshAutoTonnage() { if (document.getElementById('tonnageMode').value === 'auto') calculateTonnage(); }
 
 // ==================== 模态框 ====================
 function renderMaterialModal() {
@@ -813,21 +1036,31 @@ function bindEvents() {
     document.getElementById('exportExcelBtn').onclick = () => alert('导出功能开发中');
     document.getElementById('weightMethod').onchange = updateWeightMethod;
     document.getElementById('diePayment').onchange = updatePayment;
-    document.getElementById('pressTonnage').onchange = updatePressTonnage;
+    document.getElementById('tonnageMode').onchange = updateTonnageMode;
     document.getElementById('weldType').onchange = updateWeldType;
     document.getElementById('needGauge').onchange = updateGauge;
     document.getElementById('gaugeType').onchange = updateGaugeType;
     document.getElementById('surfaceProcess').onchange = updateSurface;
     document.getElementById('clearHistoryBtn').onclick = clearHistory;
     document.getElementById('scrapPricePreset').onchange = function() { document.getElementById('scrapPrice').value = this.value; calculate(); };
-    let ids = ['annualQty','length','width','materialSelect','materialPrice','scrapRate','blankArea','materialUtilization','partNetWeight','dieType','dieLife','processCount','dieComplexity','partialRatio','strokePerMinute','equipmentRate','laborRate','changeoverTime','batchSize','weldSpotCount','weldLength','robotWeldTime','weldFixtureCost','surfacePrice','surfaceArea','logisticsDistance','ratePerTonKm','minFreight','fullLoadQty','handlingFee','scrapPrice','customPressTonnage','customGaugePrice','gaugeLife'];
+    document.getElementById('calcPerimeterBtn').onclick = () => { if(document.getElementById('tonnageMode').value === 'auto') calculateTonnage(); };
+    document.getElementById('applyTonnageBtn').onclick = applyRecommendedTonnage;
+    document.getElementById('safetyFactor').oninput = () => { if(document.getElementById('tonnageMode').value === 'auto') calculateTonnage(); };
+    document.getElementById('perimeterManual').oninput = () => { if(document.getElementById('tonnageMode').value === 'auto') calculateTonnage(); };
+    document.getElementById('materialStrengthSelect').onchange = () => { if(document.getElementById('tonnageMode').value === 'auto') calculateTonnage(); };
+    
+    let ids = ['annualQty','length','width','materialSelect','materialPrice','scrapRate','blankArea','materialUtilization','partNetWeight','dieType','dieLife','processCount','dieComplexity','partialRatio','strokePerMinute','equipmentRate','laborRate','changeoverTime','batchSize','weldSpotCount','weldLength','robotWeldTime','weldFixtureCost','surfacePrice','surfaceArea','logisticsDistance','ratePerTonKm','minFreight','fullLoadQty','handlingFee','scrapPrice','customPressTonnage','customGaugePrice','gaugeLife','pressTonnage'];
     ids.forEach(id => { let el = document.getElementById(id); if(el) { el.addEventListener('input', calculate); if(el.tagName==='SELECT') el.addEventListener('change', calculate); } });
+    
     document.getElementById('openMaterialModalBtn').onclick = () => { renderMaterialModal(); document.getElementById('materialModal').style.display='flex'; };
     document.getElementById('closeMaterialModal').onclick = () => document.getElementById('materialModal').style.display='none';
     document.getElementById('addMaterialBtn').onclick = () => { let code=document.getElementById('newMatCode').value, type=document.getElementById('newMatType').value, spec=document.getElementById('newMatSpec').value, price=parseFloat(document.getElementById('newMatPrice').value); if(code && spec && !isNaN(price)){ stampingMaterialsData.push({id:Date.now().toString(),MaterialCode:code,Type:type,Spec:spec,Thickness:1.0,Density:7.85,UnitPrice:price}); saveMaterials(); refreshSelects(); renderMaterialModal(); calculate(); showToast('已添加'); } else alert('请完整填写'); };
     document.getElementById('openWeldModalBtn').onclick = () => { renderWeldModal(); document.getElementById('weldModal').style.display='flex'; };
     document.getElementById('closeWeldModal').onclick = () => document.getElementById('weldModal').style.display='none';
     document.getElementById('addWeldRateBtn').onclick = () => { let type=document.getElementById('newWeldTypeSelect').value, price=parseFloat(document.getElementById('newWeldRate').value), unit=document.getElementById('newWeldUnit').value; let name={spot:'点焊',mig:'二保焊',tig:'氩弧焊',laser:'激光焊',projection:'凸焊',robot:'机器人焊接'}[type]; if(!isNaN(price) && unit){ weldPriceData.push({id:Date.now().toString(),WeldType:type,DisplayName:name,Unit:unit,DefaultPrice:price}); saveWeldData(); refreshPreviewTables(); calculate(); showToast('已添加'); } else alert('请完整填写'); };
+    document.getElementById('openStrengthModalBtn').onclick = () => { renderStrengthModal(); document.getElementById('strengthModal').style.display='flex'; };
+    document.getElementById('closeStrengthModal').onclick = () => document.getElementById('strengthModal').style.display='none';
+    document.getElementById('addStrengthBtn').onclick = () => { let code=document.getElementById('newStrengthCode').value.trim(); let strength=parseFloat(document.getElementById('newStrengthValue').value); if(code && !isNaN(strength)){ materialStrengthData.push({id:Date.now().toString(),MaterialCode:code,Strength:strength,Type:'自定义'}); saveStrengthData(); refreshStrengthSelect(); renderStrengthModal(); showToast(`已添加 ${code}`); document.getElementById('newStrengthCode').value=''; document.getElementById('newStrengthValue').value=''; } else alert('请完整填写牌号和强度'); };
     document.getElementById('addBomRowBtn').onclick = () => {
         let name = document.getElementById('newPartName').value.trim();
         let qty = parseInt(document.getElementById('newPartQty').value) || 1;
@@ -857,7 +1090,7 @@ function bindEvents() {
     document.getElementById('submitFeedbackBtn').onclick = () => { let type=document.getElementById('feedbackType').value, content=document.getElementById('feedbackContent').value.trim(), contact=document.getElementById('feedbackContact').value; if(!content){ alert('请填写内容'); return; } feedbackList.unshift({id:Date.now(),type:type,content:content,contact:contact,time:new Date().toLocaleString()}); saveFeedback(); renderFeedbackList(); document.getElementById('feedbackModal').style.display='none'; document.getElementById('feedbackContent').value=''; showToast('感谢反馈！'); };
     document.getElementById('exportFeedbackBtn').onclick = () => { if(feedbackList.length===0){ alert('暂无反馈'); return; } let csv=[['ID','类型','内容','联系方式','时间']]; feedbackList.forEach(f=>csv.push([f.id,f.type,f.content,f.contact||'',f.time])); let blob=new Blob([csv.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n')],{type:'text/csv'}); let a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`feedback_${Date.now()}.csv`; a.click(); };
     document.getElementById('clearAllFeedbackBtn').onclick = () => { if(confirm('清空所有反馈？')){ feedbackList=[]; saveFeedback(); renderFeedbackList(); showToast('已清空'); } };
-    window.onclick = (e) => { if(e.target===document.getElementById('materialModal')) document.getElementById('materialModal').style.display='none'; if(e.target===document.getElementById('weldModal')) document.getElementById('weldModal').style.display='none'; if(e.target===document.getElementById('feedbackModal')) document.getElementById('feedbackModal').style.display='none'; if(e.target===document.getElementById('viewFeedbackModal')) document.getElementById('viewFeedbackModal').style.display='none'; };
+    window.onclick = (e) => { if(e.target===document.getElementById('materialModal')) document.getElementById('materialModal').style.display='none'; if(e.target===document.getElementById('weldModal')) document.getElementById('weldModal').style.display='none'; if(e.target===document.getElementById('strengthModal')) document.getElementById('strengthModal').style.display='none'; if(e.target===document.getElementById('feedbackModal')) document.getElementById('feedbackModal').style.display='none'; if(e.target===document.getElementById('viewFeedbackModal')) document.getElementById('viewFeedbackModal').style.display='none'; };
 }
 
 function initCollapse() {
@@ -878,17 +1111,17 @@ function init() {
     bindEvents();
     updateWeightMethod();
     updatePayment();
-    updatePressTonnage();
     updateWeldType();
     updateGauge();
     updateGaugeType();
     updateSurface();
+    updateTonnageMode();
     initCollapse();
     calculate();
-    showToast('冲压件成本模型 V2.0 已加载');
+    showToast('冲压件成本模型 V2.1 已加载');
 }
 
 init();
 </script>
-</body>https://alibaba-cloud.gallerycdn.vsassets.io/extensions/alibaba-cloud/tongyi-lingma/2.5.20/1770815563848/Microsoft.VisualStudio.Services.Icons.Default
+</body>
 </html>
